@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform") version "1.4.30"
     kotlin("plugin.serialization") version "1.4.30"
+    `maven-publish`
 }
 
 group = "org.neo4j"
@@ -18,6 +19,7 @@ kotlin {
         testRuns["test"].executionTask.configure {
             useJUnit()
         }
+
     }
     js(IR) { // we try to use the IR instead LEGACY as it's able to perform aggressive optimizations and other things that were difficult with the LEGACY compiler
         browser {
@@ -64,3 +66,15 @@ kotlin {
         }
     }
 }
+
+val emptyJavadocJar = tasks.register<Jar>("emptyJavadocJar") {
+    archiveClassifier.set("javadoc")
+}
+configure<PublishingExtension> {
+    publications.withType<MavenPublication>().configureEach {
+        artifact(emptyJavadocJar)
+        pom
+    }
+
+}
+
