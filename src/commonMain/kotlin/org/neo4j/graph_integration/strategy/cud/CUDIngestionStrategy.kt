@@ -8,9 +8,7 @@ import org.neo4j.graph_integration.utils.IngestionUtils
 import org.neo4j.graph_integration.utils.IngestionUtils.getLabelsAsString
 import org.neo4j.graph_integration.utils.IngestionUtils.getNodeKeysAsString
 import org.neo4j.graph_integration.utils.quote
-import kotlin.js.JsExport
 
-@JsExport
 class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String, Any>> {
 
     companion object {
@@ -134,21 +132,20 @@ class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String
                 }
             }
             .groupBy({ it.op }, { it })
-
         val create = data[CUDOperations.create]
             .orEmpty()
             .groupBy { getLabels(it) }
-            .map { Event(buildNodeCreateStatement(it.key), it.value.map { it.toMap() }) }
+            .map { buildNodeCreateStatement(it.key) to it.value.map { it.toMap() } }
         val merge = data[CUDOperations.merge]
             .orEmpty()
             .groupBy { getLabels(it) to it.ids.keys }
-            .map { Event(buildNodeMergeStatement(it.key.first, it.key.second), it.value.map { it.toMap() }) }
+            .map { buildNodeMergeStatement(it.key.first, it.key.second) to it.value.map { it.toMap() } }
         val update = data[CUDOperations.update]
             .orEmpty()
             .groupBy { getLabels(it) to it.ids.keys }
-            .map { Event(buildNodeUpdateStatement(it.key.first, it.key.second), it.value.map { it.toMap() }) }
+            .map { buildNodeUpdateStatement(it.key.first, it.key.second) to it.value.map { it.toMap() } }
         return (create + merge + update) // we'll group the data because of in case of `_id` key is present the generated queries are the same for update/merge
-            .map { it.query to it.events }
+            .map { it.first to it.second }
             .groupBy({ it.first }, { it.second })
             .map { Event(it.key, it.value.flatten()) }
             .let { IngestionEvent(it) } // TODO add invalid events

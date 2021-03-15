@@ -28,6 +28,7 @@ data class CUDNode(override val op: CUDOperations,
         fun from(map: Map<String, Any?>): CUDNode = CUDNode(
             op = CUDOperations.valueOf(map["op"]!!.toString()),
             properties = map["properties"] as? Map<String, Any?> ?: emptyMap(),
+            ids = map["ids"] as? Map<String, Any?> ?: emptyMap(),
             detach = map["detach"]?.toString().toBoolean(),
             labels = map["labels"] as? List<String> ?: emptyList()
         )
