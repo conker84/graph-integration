@@ -80,7 +80,10 @@ if (isJitPack) {
     configure<PublishingExtension> {
         publications.withType<MavenPublication>().configureEach {
             artifact(emptyJavadocJar)
-            pom
+            pom {
+                groupId = project.property("group").toString()
+                version = project.property("version").toString()
+            }
         }
     }
 }
