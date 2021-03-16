@@ -11,6 +11,9 @@ repositories {
     mavenCentral()
 }
 
+val isJitPack = System.getenv("JITPACK")?.toBoolean() ?: false
+println("isJitPack: $isJitPack")
+
 kotlin {
     jvm {
         compilations.all {
@@ -19,25 +22,26 @@ kotlin {
         testRuns["test"].executionTask.configure {
             useJUnit()
         }
-
     }
-    js(IR) { // we try to use the IR instead LEGACY as it's able to perform aggressive optimizations and other things that were difficult with the LEGACY compiler
-        browser {
-            testTask {
-                useKarma {
-                    useChromeHeadless()
+    if (!isJitPack) {
+        js(IR) { // we try to use the IR instead LEGACY as it's able to perform aggressive optimizations and other things that were difficult with the LEGACY compiler
+            browser {
+                testTask {
+                    useKarma {
+                        useChromeHeadless()
+                    }
                 }
             }
-        }
-        nodejs {
-            testTask {
-                useKarma {
-                    useChromeHeadless()
+            nodejs {
+                testTask {
+                    useKarma {
+                        useChromeHeadless()
+                    }
                 }
             }
+            useCommonJs()
+            binaries.executable()
         }
-        useCommonJs()
-        binaries.executable()
     }
 
     sourceSets {
@@ -58,23 +62,25 @@ kotlin {
                 implementation(kotlin("test-junit"))
             }
         }
-        val jsMain by getting
-        val jsTest by getting {
-            dependencies {
-                implementation(kotlin("test-js"))
+        if (!isJitPack) {
+            val jsMain by getting
+            val jsTest by getting {
+                dependencies {
+                    implementation(kotlin("test-js"))
+                }
             }
         }
     }
 }
 
-val emptyJavadocJar = tasks.register<Jar>("emptyJavadocJar") {
-    archiveClassifier.set("javadoc")
-}
-configure<PublishingExtension> {
-    publications.withType<MavenPublication>().configureEach {
-        artifact(emptyJavadocJar)
-        pom
+if (isJitPack) {
+    val emptyJavadocJar = tasks.register<Jar>("emptyJavadocJar") {
+        archiveClassifier.set("javadoc")
     }
-
+    configure<PublishingExtension> {
+        publications.withType<MavenPublication>().configureEach {
+            artifact(emptyJavadocJar)
+            pom
+        }
+    }
 }
-
