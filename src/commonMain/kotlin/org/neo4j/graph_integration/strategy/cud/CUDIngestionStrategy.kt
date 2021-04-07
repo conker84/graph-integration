@@ -4,12 +4,13 @@ import org.neo4j.graph_integration.Entity
 import org.neo4j.graph_integration.Event
 import org.neo4j.graph_integration.IngestionEvent
 import org.neo4j.graph_integration.IngestionStrategy
+import org.neo4j.graph_integration.InvalidEvent
 import org.neo4j.graph_integration.utils.IngestionUtils
 import org.neo4j.graph_integration.utils.IngestionUtils.getLabelsAsString
 import org.neo4j.graph_integration.utils.IngestionUtils.getNodeKeysAsString
 import org.neo4j.graph_integration.utils.quote
 
-class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String, Any>> {
+class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE>() {
 
     companion object {
         val ID_KEY = "ids"
@@ -103,8 +104,10 @@ class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String
             is T -> it
             is Map<*, *> -> {
                 when (it["type"]?.let { EntityType.valueOf(it.toString()) }) {
-                    EntityType.node -> CUDNode.from(it as Map<String, Any?>) as T
-                    EntityType.relationship -> CUDRelationship.from(it as Map<String, Any?>) as T
+                    EntityType.node -> if (T::class == CUDNode::class) CUDNode.from(it as Map<String, Any?>) as T
+                        else null
+                    EntityType.relationship -> if (T::class == CUDRelationship::class) CUDRelationship.from(it as Map<String, Any?>) as T
+                        else null
                     else -> null
                 }
             }
@@ -115,18 +118,22 @@ class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String
     private fun getLabels(relNode: CUDNodeRel) = if (relNode.ids.containsKey(PHYSICAL_ID_KEY)) emptyList() else relNode.labels
     private fun getLabels(node: CUDNode) = if (node.ids.containsKey(PHYSICAL_ID_KEY)) emptyList() else node.labels
 
-    override fun mergeNodeEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent<Map<String, Any>> {
+    override fun mergeNodeEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent {
+        val invalidEvents = mutableListOf<InvalidEvent>()
         val data = events
             .mapNotNull {
                 it.value?.let {
                     try {
                         val data = toCUDEntity<CUDNode>(it)
                         when (data?.op)  {
-                            CUDOperations.merge -> if (data.ids.isNotEmpty() && data.properties.isNotEmpty()) data else null // TODO send to the DLQ the null
-                            CUDOperations.update, CUDOperations.create -> if (data.properties.isNotEmpty()) data else null // TODO send to the DLQ the null
-                            else -> null
+                            CUDOperations.merge -> if (data.ids.isNotEmpty() && data.properties.isNotEmpty()) data
+                                else throw RuntimeException("`ids` and/or `properties` fields are missing or empty")
+                            CUDOperations.update, CUDOperations.create -> if (data.properties.isNotEmpty()) data
+                                else throw RuntimeException("`properties` field is missing or empty")
+                            else -> null // throw RuntimeException("Invalid event for create/merge operation")
                         }
                     } catch (e: Exception) {
+                        invalidEvents.add(InvalidEvent(e, it))
                         null
                     }
                 }
@@ -148,20 +155,23 @@ class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String
             .map { it.first to it.second }
             .groupBy({ it.first }, { it.second })
             .map { Event(it.key, it.value.flatten()) }
-            .let { IngestionEvent(it) } // TODO add invalid events
+            .let { IngestionEvent(it, invalidEvents) } // TODO add invalid events
     }
 
-    override fun deleteNodeEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent<Map<String, Any>> {
+    override fun deleteNodeEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent {
+        val invalidEvents = mutableListOf<InvalidEvent>()
         return events
             .mapNotNull {
                 it.value?.let {
                     try {
                         val data = toCUDEntity<CUDNode>(it)
                         when (data?.op)  {
-                            CUDOperations.delete -> if (data.ids.isNotEmpty() && data.properties.isEmpty()) data else null // TODO send to the DLQ the null
-                            else -> null // TODO send to the DLQ the null
+                            CUDOperations.delete -> if (data.ids.isNotEmpty() && data.properties.isEmpty()) data
+                                else throw RuntimeException("`ids` and/or `properties` fields are missing or empty")
+                            else -> null // throw RuntimeException("Invalid event for delete operation")
                         }
                     } catch (e: Exception) {
+                        invalidEvents.add(InvalidEvent(e, it))
                         null
                     }
                 }
@@ -171,20 +181,23 @@ class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String
                 val (labels, keys, detach) = it.key
                 Event(buildDeleteStatement(labels, keys, detach), it.value.map { it.toMap() })
             }
-            .let { IngestionEvent(it) } // TODO add invalid events
+            .let { IngestionEvent(it, invalidEvents) } // TODO add invalid events
     }
 
-    override fun mergeRelationshipEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent<Map<String, Any>> {
+    override fun mergeRelationshipEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent {
+        val invalidEvents = mutableListOf<InvalidEvent>()
         val data = events
             .mapNotNull {
                 it.value?.let {
                     try {
                         val data = toCUDEntity<CUDRelationship>(it)
                         when {
-                            data!!.isValidOperation() -> if (data.from.ids.isNotEmpty() && data.to.ids.isNotEmpty() && data.properties.isNotEmpty()) data else null // TODO send to the DLQ the null
-                            else -> null // TODO send to the DLQ the null
+                            data?.isValidOperation() == true -> if (data.from.ids.isNotEmpty() && data.to.ids.isNotEmpty() && data.properties.isNotEmpty()) data
+                                else throw RuntimeException("`from.ids` and/or `to.ids` and/or `properties` fields are missing or empty")
+                            else -> null // throw RuntimeException("Invalid event for create/merge operation")
                         }
                     } catch (e: Exception) {
+                        invalidEvents.add(InvalidEvent(e, it))
                         null
                     }
                 }
@@ -203,20 +216,23 @@ class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String
                         Event(query, it.value.map { it.toMap() })
                     }
             }
-            .let { IngestionEvent(it) } // TODO add invalid events
+            .let { IngestionEvent(it, invalidEvents) } // TODO add invalid events
     }
 
-    override fun deleteRelationshipEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent<Map<String, Any>> {
+    override fun deleteRelationshipEvents(events: Collection<Entity<KEY, VALUE>>): IngestionEvent {
+        val invalidEvents = mutableListOf<InvalidEvent>()
         return events
             .mapNotNull {
                 it.value?.let {
                     try {
                         val data = toCUDEntity<CUDRelationship>(it)
                         when (data?.op)  {
-                            CUDOperations.delete -> if (data.from.ids.isNotEmpty() && data.to.ids.isNotEmpty() && data.properties.isEmpty()) data else null // TODO send to the DLQ the null
-                            else -> null // TODO send to the DLQ the null
+                            CUDOperations.delete -> if (data.from.ids.isNotEmpty() && data.to.ids.isNotEmpty() && data.properties.isEmpty()) data
+                                else throw RuntimeException("`from.ids` and/or `to.ids` and/or `properties` fields are missing or empty")
+                            else -> null // throw RuntimeException("Invalid event for delete operation")
                         }
                     } catch (e: Exception) {
+                        invalidEvents.add(InvalidEvent(e, it))
                         null
                     }
                 }
@@ -226,7 +242,7 @@ class CUDIngestionStrategy<KEY, VALUE>: IngestionStrategy<KEY, VALUE, Map<String
                 val (from, to, rel_type) = it.key
                 Event(buildRelDeleteStatement(from, to, rel_type), it.value.map { it.toMap() })
             }
-            .let { IngestionEvent(it) } // TODO add invalid events
+            .let { IngestionEvent(it, invalidEvents) }
     }
 
 }

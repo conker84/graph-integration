@@ -5,15 +5,7 @@ import org.neo4j.graph_integration.strategy.cud.CUDIngestionStrategy
 @JsExport
 class CUDIngestionStrategy: IngestionStrategy {
 
-    private val strategy = CUDIngestionStrategy<Map<String, Any>, Map<String, Any>>()
+    private val strategy = CUDIngestionStrategy<Any, Any>()
 
-    override fun mergeNodeEvents(elements: Array<Any>): Any = convert(elements) { strategy.mergeNodeEvents(it) }
-
-    override fun deleteNodeEvents(elements: Array<Any>): Any = convert(elements) { strategy.deleteNodeEvents(it) }
-
-    override fun mergeRelationshipEvents(elements: Array<Any>): Any =
-        convert(elements) { strategy.mergeRelationshipEvents(it) }
-
-    override fun deleteRelationshipEvents(elements: Array<Any>): Any =
-        convert(elements) { strategy.deleteRelationshipEvents(it) }
+    override fun events(elements: Array<Any>): Any = convert(elements) { strategy.events(it) }
 }

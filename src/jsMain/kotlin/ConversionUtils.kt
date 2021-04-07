@@ -30,13 +30,13 @@ private fun toJavascript(input: Any?): dynamic {
     return when (input) {
         is Collection<*> -> input.map { toJavascript(it) }.toTypedArray()
         is Array<*> -> input.map { toJavascript(it) }.toTypedArray()
-        is Event<*> -> {
+        is Event -> {
             val data = js("({})")
             data["query"] = input.query
             data["events"] = toJavascript(input.events)
             data
         }
-        is IngestionEvent<*> -> {
+        is IngestionEvent -> {
             val data = js("({})")
             data["events"] = toJavascript(input.events)
             data["invalidEvents"] = toJavascript(input.invalidEvents)
@@ -47,7 +47,7 @@ private fun toJavascript(input: Any?): dynamic {
             input.forEach { e -> data[e.key] = toJavascript(e.value) }
             data
         }
-        is InvalidEvent<*> -> {
+        is InvalidEvent -> {
             val data = js("({})")
             data["error"] = toJavascript(input.error)
             data["event"] = toJavascript(input.event)
@@ -70,7 +70,7 @@ fun entityOf(jsObject: dynamic): Entity<Map<String, Any?>, Map<String, Any?>> {
     return Entity(keyMap, mapOf(jsObject["value"]))
 }
 
-fun convert(elements: Array<Any>, body: (List<dynamic>) -> IngestionEvent<Map<String, Any>>): Any {
+fun convert(elements: Array<Any>, body: (List<dynamic>) -> IngestionEvent): Any {
     val listEvents = elements.map { entityOf(it.asDynamic()) }
     val result = body(listEvents)
     return dynamicOf(result) as Any

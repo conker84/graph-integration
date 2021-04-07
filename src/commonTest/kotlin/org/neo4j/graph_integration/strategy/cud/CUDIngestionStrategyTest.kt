@@ -10,16 +10,16 @@ import kotlin.test.assertTrue
 
 class CUDIngestionStrategyTest {
 
-    private fun findEventByQuery(query: String, evts: List<Event<Map<String, Any>>>) = evts.find { it.query == query }!!
+    private fun findEventByQuery(query: String, evts: List<Event>) = evts.find { it.query == query }!!
 
-    private fun assertNodeEventsContainsKey(qe: Event<Map<String, Any>>, vararg keys: String) = assertTrue {
+    private fun assertNodeEventsContainsKey(qe: Event, vararg keys: String) = assertTrue {
         qe.events.all {
             val ids = it[CUDIngestionStrategy.ID_KEY] as Map<String, Any>
             ids.keys.containsAll(keys.toList())
         }
     }
 
-    private fun assertRelationshipEventsContainsKey(qe: Event<Map<String, Any>>, fromKey: String, toKey: String) = assertTrue {
+    private fun assertRelationshipEventsContainsKey(qe: Event, fromKey: String, toKey: String) = assertTrue {
         qe.events.all {
             val from = it["from"] as Map<String, Any>
             val idsFrom = from[CUDIngestionStrategy.ID_KEY] as Map<String, Any>
@@ -106,9 +106,9 @@ class CUDIngestionStrategyTest {
         assertEquals(1, updateNodeFooBarLabel.events.size)
         assertNodeEventsContainsKey(updateNodeFooBarLabel, key)
     }
-/*
+
     @Test
-    fun `should create, merge, update and delete nodes with garbage data`() {
+    fun shouldCreateMergeUpdateAndDeleteNodesWithGarbageData() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -127,16 +127,16 @@ class CUDIngestionStrategyTest {
                 labels = labels,
                 ids = ids,
                 properties = properties)
-            StreamsSinkEntity(null, cudNode)
+            Entity<String, CUD>(null, cudNode)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), relationshipEvents)
@@ -195,7 +195,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create nodes only with valid CUD operations`() {
+    fun shouldCreateNodesOnlyWithValidCUDOperations() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val invalidMarkers = listOf(3, 6, 9)
@@ -211,16 +211,16 @@ class CUDIngestionStrategyTest {
                 labels = labels,
                 ids = ids,
                 properties = properties)
-            StreamsSinkEntity(null, cudNode)
+            Entity<String, CUD>(null, cudNode)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeDeleteEvents)
@@ -245,7 +245,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge and update relationships only with valid node operations`() {
+    fun shouldCreateMergeAndUpdateRelationshipsOnlyWithValidNodeOperations() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val invalidMarker = listOf(3, 4, 6, 9)
@@ -260,16 +260,16 @@ class CUDIngestionStrategyTest {
             val start = CUDNodeRel(ids = mapOf(key to it), labels = labels, op= if (it in invalidMarker) CUDOperations.delete else CUDOperations.create)
             val end = CUDNodeRel(ids = mapOf(key to it + 1), labels = labels)
             val rel = CUDRelationship(op = op, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -301,7 +301,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should delete nodes with internal id reference`() {
+    fun shouldDeleteNodesWithInternalIdReference() {
         // given
         val detachMarkers = listOf(1, 3, 8, 10)
         val list = (1..10).map {
@@ -313,16 +313,16 @@ class CUDIngestionStrategyTest {
                 ids = mapOf("_id" to it),
                 properties = properties,
                 detach = detach)
-            StreamsSinkEntity(null, cudNode)
+            Entity<String, CUD>(null, cudNode)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -363,7 +363,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge and update nodes with internal id reference`() {
+    fun shouldCreateMergeAndUpdateNodesWithInternalIdReference() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -379,16 +379,16 @@ class CUDIngestionStrategyTest {
                 labels = labels,
                 ids = ids,
                 properties = properties)
-            StreamsSinkEntity(null, cudNode)
+            Entity<String, CUD>(null, cudNode)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeDeleteEvents)
@@ -419,7 +419,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge and update relationships`() {
+    fun shouldCreateMergeAndUpdateRelationships() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -435,16 +435,16 @@ class CUDIngestionStrategyTest {
             val start = CUDNodeRel(ids = mapOf(key to it), labels = labels)
             val end = CUDNodeRel(ids = mapOf(key to it + 1), labels = labels)
             val rel = CUDRelationship(op = op, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -514,7 +514,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge and update relationships with merge op in 'from' and 'to' node`() {
+    fun shouldCreateMergeAndUpdateRelationshipsWithMergeOpInFromAndToNode() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -530,16 +530,16 @@ class CUDIngestionStrategyTest {
             val start = CUDNodeRel(ids = mapOf(key to it), labels = labels, op = CUDOperations.merge)
             val end = CUDNodeRel(ids = mapOf(key to it + 1), labels = labels, op = CUDOperations.merge)
             val rel = CUDRelationship(op = op, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -609,7 +609,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge and update relationships with match op in 'from' node and merge or create in 'to' node`() {
+    fun shouldCreateMergeAndUpdateRelationshipsWithMatchOpInFromNodeAndMergeOrCreateInToNode() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -625,16 +625,16 @@ class CUDIngestionStrategyTest {
             val start = CUDNodeRel(ids = mapOf(key to it), labels = labels, op = CUDOperations.match)
             val end = CUDNodeRel(ids = mapOf(key to it + 1), labels = labels, op = if (it <= 5) CUDOperations.merge else CUDOperations.create)
             val rel = CUDRelationship(op = op, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -705,7 +705,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge and update relationships with match op in 'to' node and merge or create in 'from' node`() {
+    fun shouldCreateMergeAndUpdateRelationshipsWithMatchOpInToNodeAndMergeOrCreateInFromNode() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -721,16 +721,16 @@ class CUDIngestionStrategyTest {
             val start = CUDNodeRel(ids = mapOf(key to it), labels = labels, op = if (it <= 5) CUDOperations.merge else CUDOperations.create)
             val end = CUDNodeRel(ids = mapOf(key to it + 1), labels = labels, CUDOperations.match)
             val rel = CUDRelationship(op = op, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -801,7 +801,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should delete relationships`() {
+    fun shouldDeleteRelationships() {
         // given
         val key = "key"
         val list = (1..10).map {
@@ -810,16 +810,16 @@ class CUDIngestionStrategyTest {
             val start = CUDNodeRel(ids = mapOf(key to it), labels = labels)
             val end = CUDNodeRel(ids = mapOf(key to it + 1), labels = labels)
             val rel = CUDRelationship(op = CUDOperations.delete, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -849,7 +849,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should delete relationships with internal id reference`() {
+    fun shouldDeleteRelationshipsWithInternalIdReference() {
         // given
         val key = "_id"
         val list = (1..10).map {
@@ -859,16 +859,16 @@ class CUDIngestionStrategyTest {
             val relKey = if (it % 2 == 0) key else "key"
             val end = CUDNodeRel(ids = mapOf(relKey to it + 1), labels = labels)
             val rel = CUDRelationship(op = CUDOperations.delete, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -899,7 +899,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge and update relationships with internal id reference`() {
+    fun shouldCreateMergeAndUpdateRelationshipsWithInternalIdReference() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -914,16 +914,16 @@ class CUDIngestionStrategyTest {
             val start = CUDNodeRel(ids = mapOf("_id" to it), labels = labels)
             val end = CUDNodeRel(ids = mapOf("_id" to it + 1), labels = labels)
             val rel = CUDRelationship(op = op, properties = properties, from = start, to = end, rel_type = "MY_REL")
-            StreamsSinkEntity(null, rel)
+            Entity<String, CUD>(null, rel)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), nodeEvents)
@@ -965,7 +965,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge, update and delete nodes with compound keys`() {
+    fun shouldCreateMergeUpdateAndDeleteNodesWithCompoundKeys() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -985,16 +985,16 @@ class CUDIngestionStrategyTest {
                 labels = labels,
                 ids = ids,
                 properties = properties)
-            StreamsSinkEntity(null, cudNode)
+            Entity<String, CUD>(null, cudNode)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), relationshipEvents)
@@ -1059,7 +1059,7 @@ class CUDIngestionStrategyTest {
     }
 
     @Test
-    fun `should create, merge, update and delete nodes without labels`() {
+    fun shouldCreateMergeUpdateAndDeleteNodesWithoutLabels() {
         // given
         val mergeMarkers = listOf(2, 5, 7)
         val updateMarkers = listOf(3, 6)
@@ -1078,16 +1078,16 @@ class CUDIngestionStrategyTest {
                 labels = labels,
                 ids = ids,
                 properties = properties)
-            StreamsSinkEntity(null, cudNode)
+            Entity<String, CUD>(null, cudNode)
         }
 
         // when
-        val cudQueryStrategy = CUDIngestionStrategy()
-        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list)
-        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list)
+        val cudQueryStrategy = CUDIngestionStrategy<String, CUD>()
+        val nodeEvents = cudQueryStrategy.mergeNodeEvents(list).events
+        val nodeDeleteEvents = cudQueryStrategy.deleteNodeEvents(list).events
 
-        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list)
-        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list)
+        val relationshipEvents = cudQueryStrategy.mergeRelationshipEvents(list).events
+        val relationshipDeleteEvents = cudQueryStrategy.deleteRelationshipEvents(list).events
 
         // then
         assertEquals(emptyList(), relationshipEvents)
@@ -1128,5 +1128,5 @@ class CUDIngestionStrategyTest {
         assertEquals(1, nodeDeleteEvent.events.size)
         assertNodeEventsContainsKey(updateNode, key)
     }
-*/
+
 }
